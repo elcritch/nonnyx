@@ -1,4 +1,4 @@
-import nonnx_private
+import nonnx/private
 
 type
   Env* = object
