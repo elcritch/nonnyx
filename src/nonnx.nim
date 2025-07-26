@@ -1,45 +1,35 @@
 import nonnx/private
 
 type
-  Env* = object
-    p: ptr OrtEnv
+  Env* = ref object
+    p: OrtEnv
+  SessionOptions* = ref object
+    p: OrtSessionOptions
+  Session* = ref object
+    p: OrtSession
+    env: Env
+    options: SessionOptions
 
 proc newEnv*(log_severity_level: OrtLoggingLevel, logid: string): Env =
-  var env: ptr OrtEnv
+  new(result)
   let api = GetApi()
-  let status = api.CreateEnv(log_severity_level, logid, env.addr)
+  let status = api.CreateEnv(log_severity_level, logid, result.p.addr)
   if status != nil:
     let error_message = $api.GetErrorMessage(status)
     api.ReleaseStatus(status)
     raise newException(Exception, "Failed to create OrtEnv: " & error_message)
-  result = Env(p: env)
 
 proc `$`*(env: Env): string =
   "OrtEnv"
 
-proc `=destroy`*(env: Env) =
-  if env.p != nil:
-    let api = GetApi()
-    api.ReleaseEnv(env.p)
-
-type
-  SessionOptions* = object
-    p: ptr OrtSessionOptions
-
 proc newSessionOptions*(): SessionOptions =
-  var options: ptr OrtSessionOptions
+  new(result)
   let api = GetApi()
-  let status = api.CreateSessionOptions(options.addr)
+  let status = api.CreateSessionOptions(result.p.addr)
   if status != nil:
     let error_message = $api.GetErrorMessage(status)
     api.ReleaseStatus(status)
     raise newException(Exception, "Failed to create OrtSessionOptions: " & error_message)
-  result = SessionOptions(p: options)
-
-proc `=destroy`*(options: SessionOptions) =
-  if options.p != nil:
-    let api = GetApi()
-    api.ReleaseSessionOptions(options.p)
 
 proc enableCpuMemArena*(options: SessionOptions) =
   let api = GetApi()
@@ -57,25 +47,16 @@ proc disableCpuMemArena*(options: SessionOptions) =
     api.ReleaseStatus(status)
     raise newException(Exception, "Failed to disable CPU memory arena: " & error_message)
 
-type
-  Session* = object
-    p: ptr OrtSession
-    env: Env
-    options: SessionOptions
-
-export nonnx_private.OrtLoggingLevel, nonnx_private.ExecutionMode, nonnx_private.GraphOptimizationLevel
+export private.OrtLoggingLevel, private.ExecutionMode, private.GraphOptimizationLevel
 
 proc newSession*(env: Env, modelPath: string, options: SessionOptions): Session =
-  var session: ptr OrtSession
+  new(result)
   let api = GetApi()
-  let status = api.CreateSession(env.p, modelPath, options.p, session.addr)
+  let status = api.CreateSession(env.p, modelPath, options.p, result.p.addr)
   if status != nil:
     let error_message = $api.GetErrorMessage(status)
     api.ReleaseStatus(status)
     raise newException(Exception, "Failed to create OrtSession: " & error_message)
-  result = Session(p: session, env: env, options: options)
+  result.env = env
+  result.options = options
 
-proc `=destroy`*(session: Session) =
-  if session.p != nil:
-    let api = GetApi()
-    api.ReleaseSession(session.p)
